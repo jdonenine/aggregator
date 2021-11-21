@@ -1,0 +1,21 @@
+application:
+  test: test
+
+spring:
+  application:
+    name: telemetry-aggregator
+  data:
+    cassandra:
+      keyspace-name: ${ASTRA_DB_KEYSPACE:telemetry}
+      username: ${ASTRA_DB_CLIENT_ID}
+      password: ${ASTRA_DB_CLIENT_SECRET}
+      schema-action: CREATE_IF_NOT_EXISTS
+      request:
+        timeout: 10s
+      connection:
+        connect-timeout: 10s
+        init-query-timeout: 10s
+
+datastax:
+  astra:
+    secure-connect-bundle: ${ASTRA_DB_BUNDLE}
