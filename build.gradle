@@ -14,11 +14,6 @@ configurations {
 	}
 }
 
-jar {
-	enabled = true
-	archiveClassifier = '' // Disable the building of plain.jar
-}
-
 repositories {
 	mavenCentral()
 }
