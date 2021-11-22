@@ -14,13 +14,13 @@ import org.springframework.data.cassandra.core.mapping.Table;
 import java.time.Instant;
 import java.util.UUID;
 
-@Table(value = "telemetry_images_observed")
+@Table(value = "telemetry_image_observations")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class TelemetryImagesObserved {
+public class TelemetryImageObservation {
   @PrimaryKey
-  private TelemetryImagesObservedPrimaryKey primaryKey;
+  private TelemetryImageObservationPrimaryKey primaryKey;
 
   @Column(value = "image_name")
   @CassandraType(type = CassandraType.Name.TEXT)
@@ -38,7 +38,7 @@ public class TelemetryImagesObserved {
   @Data
   @NoArgsConstructor
   @AllArgsConstructor
-  public static class TelemetryImagesObservedPrimaryKey {
+  public static class TelemetryImageObservationPrimaryKey {
     @PrimaryKeyColumn(name = "image_id", type = PrimaryKeyType.PARTITIONED, ordinal = 0)
     @CassandraType(type = CassandraType.Name.UUID)
     private UUID imageId;

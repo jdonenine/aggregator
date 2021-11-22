@@ -1,12 +1,11 @@
 package com.datastax.hackathon.telemetry.aggregator.jobs;
 
-import com.datastax.hackathon.telemetry.aggregator.exceptions.ServiceException;
 import com.datastax.hackathon.telemetry.aggregator.model.Telemetry;
-import com.datastax.hackathon.telemetry.aggregator.model.TelemetryImagesObserved;
-import com.datastax.hackathon.telemetry.aggregator.model.TelemetryObserved;
-import com.datastax.hackathon.telemetry.aggregator.repositories.TelemetryImagesObservedRepository;
-import com.datastax.hackathon.telemetry.aggregator.repositories.TelemetryObservedRepository;
-import com.datastax.hackathon.telemetry.aggregator.services.TelemetryService;
+import com.datastax.hackathon.telemetry.aggregator.model.TelemetryImageObservation;
+import com.datastax.hackathon.telemetry.aggregator.model.TelemetryObservation;
+import com.datastax.hackathon.telemetry.aggregator.repositories.TelemetryImageObservationRepository;
+import com.datastax.hackathon.telemetry.aggregator.repositories.TelemetryObservationRepository;
+import com.datastax.hackathon.telemetry.aggregator.repositories.TelemetryRepository;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -28,32 +27,62 @@ public class TelemetryObservationJob implements Job {
   private static final ChronoUnit BUCKET_SIZE = ChronoUnit.DAYS;
 
   @Autowired
-  private TelemetryService telemetryService;
+  private TelemetryRepository telemetryRepository;
 
   @Autowired
-  private TelemetryImagesObservedRepository telemetryImagesObservedRepository;
+  private TelemetryImageObservationRepository telemetryImageObservationRepository;
 
   @Autowired
-  private TelemetryObservedRepository telemetryObservedRepository;
+  private TelemetryObservationRepository telemetryObservationRepository;
 
   @Override
   public void execute(JobExecutionContext context) throws JobExecutionException {
-    if (telemetryService == null) {
-      throw new JobExecutionException("TelemetryService is not available, job cannot be executed.");
+    log.info("Starting job {}.", context.getJobDetail().getKey().getGroup() + "/" + context.getJobDetail().getKey().getName());
+
+    if (telemetryRepository == null) {
+      throw new JobExecutionException("TelemetryRepository is not available, job cannot be executed.");
+    }
+    if (telemetryImageObservationRepository == null) {
+      throw new JobExecutionException("TelemetryImageObservationRepository is not available, job cannot be executed.");
+    }
+    if (telemetryObservationRepository == null) {
+      throw new JobExecutionException("TelemetryObservationRepository is not available, job cannot be executed.");
     }
 
+    // Figure out what time we last gathered data -- we'll start from there
+    // If we haven't run before, grab it all effectively
+    // This is inefficient, but for the hackathon it will have to do
+    // It'll be wasteful but safe though as we'll regenerate the same data
+    // This should only happen on the first run of the application
+    Instant timeLastObserved = context.getPreviousFireTime() != null ? context.getPreviousFireTime().toInstant() : Instant.EPOCH;
+
+    // We'll need data back to the beginning of the bucket in which our new data will start
+    // This will recalculate the first bucket on, which is necessary so that we have all of the unique samples in that time
+    Instant startingBucket = timeLastObserved.truncatedTo(BUCKET_SIZE);
+
+    // Get all of the telemetry samples going back to the start of the first bucket we'll cover in this run
     List<Telemetry> telemetries = null;
     try {
-      telemetries = telemetryService.getAllTelemetries();
-    } catch (ServiceException e) {
+      telemetries = telemetryRepository.findAllAfter(startingBucket);
+    } catch (Exception e) {
       throw new JobExecutionException("Unable to retrieve Telemetry records.", e);
     }
 
-    List<TelemetryObserved> telemetryObservations = Lists.newArrayList();
-    List<TelemetryImagesObserved> telemetryImagesObservations = Lists.newArrayList();
+    log.info("Processing {} telemetry records found back to {}.", telemetries != null ? telemetries.size() : 0, startingBucket);
+    if (telemetries == null || telemetries.isEmpty()) {
+      return;
+    }
 
+    // We'll build data samples that aggregate data generally for the full telemetry system
+    List<TelemetryObservation> telemetryObservations = Lists.newArrayList();
+    // And for each image in use amongst the telemetry users
+    List<TelemetryImageObservation> telemetryImagesObservations = Lists.newArrayList();
+
+    // Place the telemetry samples in time buckets
+    // Data will be aggregated to these buckets
     Map<Instant, List<Telemetry>> telemetriesByCreatedAt = bucketizeTelemetryByCreatedAt(telemetries, BUCKET_SIZE);
 
+    // Process each bucket
     for (Instant bucket : telemetriesByCreatedAt.keySet()) {
       List<Telemetry> telemetriesInBucket = telemetriesByCreatedAt.get(bucket);
       if (telemetriesInBucket == null) {
@@ -94,41 +123,43 @@ public class TelemetryObservationJob implements Job {
         }
       }
 
-      TelemetryObserved telemetryObserved = new TelemetryObserved();
-      TelemetryObserved.TelemetryObservedPrimaryKey telemetryObservedPrimaryKey = new TelemetryObserved.TelemetryObservedPrimaryKey();
-      telemetryObservedPrimaryKey.setObservedAt(bucket);
-      telemetryObservedPrimaryKey.setJobId(UUID.nameUUIDFromBytes(context.getJobDetail().getKey().getName().getBytes()));
-      telemetryObserved.setPrimaryKey(telemetryObservedPrimaryKey);
-      telemetryObserved.setNumCustomers(customerIdsInBucket.size());
-      telemetryObserved.setNumClusters(clusterIdsInBucket.size());
-      telemetryObservations.add(telemetryObserved);
+      TelemetryObservation telemetryObservation = new TelemetryObservation();
+      TelemetryObservation.TelemetryObservationPrimaryKey telemetryObservationPrimaryKey = new TelemetryObservation.TelemetryObservationPrimaryKey();
+      telemetryObservationPrimaryKey.setObservedAt(bucket);
+      telemetryObservationPrimaryKey.setJobId(UUID.nameUUIDFromBytes(context.getJobDetail().getKey().getName().getBytes()));
+      telemetryObservation.setPrimaryKey(telemetryObservationPrimaryKey);
+      telemetryObservation.setNumCustomers(customerIdsInBucket.size());
+      telemetryObservation.setNumClusters(clusterIdsInBucket.size());
+      telemetryObservations.add(telemetryObservation);
 
       for (String imageId : imageIdsInBucket) {
         Set<UUID> customerIdsForImageId = customerIdsInBucketByImageId.getOrDefault(imageId, Sets.newHashSet());
         Set<String> clusterIdsForImageId = clusterIdsInBucketByImageId.getOrDefault(imageId, Sets.newHashSet());
-        TelemetryImagesObserved telemetryImagesObserved = new TelemetryImagesObserved();
-        TelemetryImagesObserved.TelemetryImagesObservedPrimaryKey telemetryImagesObservePrimaryKey = new TelemetryImagesObserved.TelemetryImagesObservedPrimaryKey();
+        TelemetryImageObservation telemetryImageObservation = new TelemetryImageObservation();
+        TelemetryImageObservation.TelemetryImageObservationPrimaryKey telemetryImagesObservePrimaryKey = new TelemetryImageObservation.TelemetryImageObservationPrimaryKey();
         telemetryImagesObservePrimaryKey.setImageId(UUID.nameUUIDFromBytes(imageId.getBytes()));
         telemetryImagesObservePrimaryKey.setObservedAt(bucket);
-        telemetryImagesObserved.setPrimaryKey(telemetryImagesObservePrimaryKey);
-        telemetryImagesObserved.setNumClusters(clusterIdsForImageId.size());
-        telemetryImagesObserved.setNumCustomers(customerIdsForImageId.size());
-        telemetryImagesObserved.setImageName(imageId);
-        telemetryImagesObservations.add(telemetryImagesObserved);
+        telemetryImageObservation.setPrimaryKey(telemetryImagesObservePrimaryKey);
+        telemetryImageObservation.setNumClusters(clusterIdsForImageId.size());
+        telemetryImageObservation.setNumCustomers(customerIdsForImageId.size());
+        telemetryImageObservation.setImageName(imageId);
+        telemetryImagesObservations.add(telemetryImageObservation);
       }
     }
 
     try {
-      telemetryObservedRepository.saveAll(telemetryObservations);
+      telemetryObservationRepository.saveAll(telemetryObservations);
     } catch (Exception e) {
       throw new JobExecutionException("Unable to save TelemetryObserved records.", e);
     }
 
     try {
-      telemetryImagesObservedRepository.saveAll(telemetryImagesObservations);
+      telemetryImageObservationRepository.saveAll(telemetryImagesObservations);
     } catch (Exception e) {
       throw new JobExecutionException("Unable to save TelemetryImagesObserved records.", e);
     }
+
+    log.info("Completed job {}.", context.getJobDetail().getKey().getGroup() + "/" + context.getJobDetail().getKey().getName());
   }
 
   private static Map<Instant, List<Telemetry>> bucketizeTelemetryByCreatedAt(List<Telemetry> telemetries, ChronoUnit bucketSize) {

@@ -12,19 +12,19 @@ import java.util.Properties;
 
 @Configuration
 @Slf4j
-public class MonitoringSchedulerConfiguration {
+public class AggregationSchedulerConfiguration {
   private final ApplicationContext applicationContext;
   private final QuartzProperties quartzProperties;
 
   @Autowired
-  public MonitoringSchedulerConfiguration(ApplicationContext applicationContext, QuartzProperties quartzProperties) {
+  public AggregationSchedulerConfiguration(ApplicationContext applicationContext, QuartzProperties quartzProperties) {
     this.applicationContext = applicationContext;
     this.quartzProperties = quartzProperties;
   }
 
   @Bean
   public SchedulerFactoryBean schedulerFactoryBean() {
-    MonitoringSchedulerJobFactory jobFactory = new MonitoringSchedulerJobFactory();
+    AggregationSchedulerJobFactory jobFactory = new AggregationSchedulerJobFactory();
     jobFactory.setApplicationContext(applicationContext);
 
     Properties properties = new Properties();

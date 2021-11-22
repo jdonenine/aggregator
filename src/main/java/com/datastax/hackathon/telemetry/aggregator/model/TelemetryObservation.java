@@ -13,16 +13,15 @@ import org.springframework.data.cassandra.core.mapping.PrimaryKeyColumn;
 import org.springframework.data.cassandra.core.mapping.Table;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 
-@Table(value = "telemetry_observed")
+@Table(value = "telemetry_observations")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class TelemetryObserved {
+public class TelemetryObservation {
   @PrimaryKey
-  private TelemetryObservedPrimaryKey primaryKey;
+  private TelemetryObservationPrimaryKey primaryKey;
 
   @Column(value = "num_clusters")
   @CassandraType(type = CassandraType.Name.INT)
@@ -36,7 +35,7 @@ public class TelemetryObserved {
   @Data
   @NoArgsConstructor
   @AllArgsConstructor
-  public static class TelemetryObservedPrimaryKey {
+  public static class TelemetryObservationPrimaryKey {
     @PrimaryKeyColumn(name = "job_id", type = PrimaryKeyType.PARTITIONED, ordinal = 0)
     @CassandraType(type = CassandraType.Name.UUID)
     private UUID jobId;

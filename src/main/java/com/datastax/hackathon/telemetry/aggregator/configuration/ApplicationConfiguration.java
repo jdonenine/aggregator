@@ -14,5 +14,5 @@ import org.springframework.context.annotation.Configuration;
 @NoArgsConstructor
 @Data
 public class ApplicationConfiguration {
-  private String test;
+  private Integer aggregationJobFrequencyM;
 }

@@ -1,8 +1,7 @@
 package com.datastax.hackathon.telemetry.aggregator.controllers.v1;
 
-import com.datastax.hackathon.telemetry.aggregator.exceptions.ServiceException;
 import com.datastax.hackathon.telemetry.aggregator.model.Telemetry;
-import com.datastax.hackathon.telemetry.aggregator.services.TelemetryService;
+import com.datastax.hackathon.telemetry.aggregator.repositories.TelemetryRepository;
 import com.datastax.oss.driver.shaded.guava.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,23 +21,23 @@ import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 @RestController
 @RequestMapping("api/v1/telemetry")
 public class TelemetryController {
-  private final TelemetryService telemetryService;
+  private final TelemetryRepository telemetryRepository;
 
   @Autowired
-  public TelemetryController(TelemetryService telemetryService) {
-    this.telemetryService = telemetryService;
+  public TelemetryController(TelemetryRepository telemetryRepository) {
+    this.telemetryRepository = telemetryRepository;
   }
 
   @GetMapping(produces = APPLICATION_JSON_VALUE)
   public List<Telemetry> getAllTelemetries() {
-    if (telemetryService == null) {
-      log.error("TelemetryService is invalid, requests cannot be processed.");
+    if (telemetryRepository == null) {
+      log.error("telemetryRepository is invalid, requests cannot be processed.");
       throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     try {
-      return telemetryService.getAllTelemetries();
-    } catch (Exception | ServiceException e) {
+      return telemetryRepository.findAll();
+    } catch (Exception e) {
       log.error("Unable to retrieve Telemetry records.", e);
       throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -46,8 +45,8 @@ public class TelemetryController {
 
   @GetMapping(value = "/rpc/generate-sample-data", produces = APPLICATION_JSON_VALUE)
   public List<Telemetry> createSampleTelemetries() {
-    if (telemetryService == null) {
-      log.error("TelemetryService is invalid, requests cannot be processed.");
+    if (telemetryRepository == null) {
+      log.error("telemetryRepository is invalid, requests cannot be processed.");
       throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
@@ -127,8 +126,8 @@ public class TelemetryController {
     telemetry4.setTag("app:orchestrator");
 
     try {
-      return telemetryService.saveTelemetry(Lists.newArrayList(telemetry, telemetry1, telemetry2, telemetry3, telemetry4));
-    } catch (Exception | ServiceException e) {
+      return telemetryRepository.saveAll(Lists.newArrayList(telemetry, telemetry1, telemetry2, telemetry3, telemetry4));
+    } catch (Exception e) {
       log.error("Unable to save Telemetries.", e);
       throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR);
     }

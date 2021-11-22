@@ -1,8 +1,7 @@
 package com.datastax.hackathon.telemetry.aggregator.controllers.v1;
 
-import com.datastax.hackathon.telemetry.aggregator.exceptions.ServiceException;
 import com.datastax.hackathon.telemetry.aggregator.model.Customer;
-import com.datastax.hackathon.telemetry.aggregator.services.CustomerService;
+import com.datastax.hackathon.telemetry.aggregator.repositories.CustomerRepository;
 import com.datastax.oss.driver.shaded.guava.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,24 +20,24 @@ import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 @Slf4j
 @RestController
 @RequestMapping("api/v1/customers")
-public class CustomersController {
-  private final CustomerService customerService;
+public class CustomerController {
+  private final CustomerRepository customerRepository;
 
   @Autowired
-  public CustomersController(CustomerService customerService) {
-    this.customerService = customerService;
+  public CustomerController(CustomerRepository customerRepository) {
+    this.customerRepository = customerRepository;
   }
 
   @GetMapping(produces = APPLICATION_JSON_VALUE)
   public List<Customer> getAllCustomers() {
-    if (customerService == null) {
+    if (customerRepository == null) {
       log.error("CustomerService is invalid, requests cannot be processed.");
       throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     try {
-      return customerService.getAllCustomers();
-    } catch (Exception | ServiceException e) {
+      return customerRepository.findAll();
+    } catch (Exception e) {
       log.error("Unable to retrieve Customer records.", e);
       throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -46,7 +45,7 @@ public class CustomersController {
 
   @GetMapping(value = "/rpc/generate-sample-data", produces = APPLICATION_JSON_VALUE)
   public List<Customer> createSampleCustomers() {
-    if (customerService == null) {
+    if (customerRepository == null) {
       log.error("CustomerService is invalid, requests cannot be processed.");
       throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -79,8 +78,8 @@ public class CustomersController {
     customer2.setUniqueToken("96438808-b31b-4f8c-a199-d419536b0483");
 
     try {
-      return customerService.saveCustomers(Lists.newArrayList(customer, customer1, customer2));
-    } catch (Exception | ServiceException e) {
+      return customerRepository.saveAll(Lists.newArrayList(customer, customer1, customer2));
+    } catch (Exception e) {
       log.error("Unable to save customers.", e);
       throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR);
     }

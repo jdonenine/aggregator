@@ -1,5 +1,5 @@
 application:
-  test: test
+  aggregation-job-frequency-m: ${APP_AGGREGATION_JOB_FREQUENCY_M:1}
 
 spring:
   application:

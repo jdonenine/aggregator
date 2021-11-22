@@ -31,7 +31,7 @@ public class AggregationScheduler {
   private void initializeConfiguredSchedules() {
     String telemetryJobGroup = "telemetry";
 
-    Integer telemetryObservationJobFrequencyM = 1;
+    Integer telemetryObservationJobFrequencyM = applicationConfiguration.getAggregationJobFrequencyM() != null ? applicationConfiguration.getAggregationJobFrequencyM() : 1;
     String telemetryObservationJobId = "telemetry-observation";
     String telemetryObservationJobDescription = "Collect and aggregate telemetry data in time buckets";
     JobDetail customerAggregationJobDetail = JobBuilder.newJob(TelemetryObservationJob.class).withIdentity(telemetryObservationJobId, telemetryJobGroup).withDescription(telemetryObservationJobDescription).build();
